@@ -1,0 +1,17 @@
+{
+  "name": "ssr_test",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ssr-server.js"
+  },
+  "author": "lyp1noff",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "express": "^4.21.2",
+    "puppeteer": "^23.11.1",
+    "puppeteer-cluster": "^0.24.0",
+    "redis": "^4.7.0"
+  }
+}
