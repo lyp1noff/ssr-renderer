@@ -1,7 +1,28 @@
-version: '3'
+networks:
+  ssr-network:
+    driver: bridge
+
 services:
   ssr-server:
     build: .
     container_name: ssr-server
+    environment:
+      - PSSR_PROXY_URL=https://helen-marlen.com
+      - PSSR_PORT_NUMBER=3003
+      - PSSR_BLACKLIST_REGEXP=^/(static|fonts|assets)/.*|^/(favicon.ico|logo-GYY.svg)$
+      - PSSR_LOG_DEBUG=true
+    restart: always
+    networks:
+      - ssr-network
+  varnish:
+    image: varnish:6.0
+    volumes:
+      - ./varnish/default.vcl:/etc/varnish/default.vcl
+    command: varnishd -F -f /etc/varnish/default.vcl -a :3002
     ports:
-      - "127.0.0.1:3003:3000"
+      - "3002:3002"
+    restart: always
+    depends_on:
+      - ssr-server
+    networks:
+      - ssr-network
