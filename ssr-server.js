@@ -47,12 +47,23 @@ async function refreshBrowser() {
 async function handleRequest(req, res) {
   debug("Incoming request for " + req.originalUrl);
   const url = PROXY_URL + req.originalUrl;
+  const customHeaders = {
+    "X-Redirect-By": "ssr-server",
+    "X-Real-IP": req.headers["x-real-ip"] || req.connection.remoteAddress || "", 
+    "X-Forwarded-For": req.headers["x-forwarded-for"] || req.connection.remoteAddress || "",
+    "User-Agent": req.headers["user-agent"] || "",
+  };
   if (WHITELIST_REGEXP.test(req.originalUrl) && !BLACKLIST_REGEXP.test(req.originalUrl)) {
-    res.writeHead(200, { "Content-Type": "text/html" });
-    res.end(await ssr(url));
+    try {
+      const content = await ssr(url, customHeaders);
+      res.end(content);
+    } catch (e) {
+      debug(`SSR error for ${url}: ${e.message}`);
+      res.status(500).send("SSR Failed: Unable to load page.");
+    }
   } else {
     axios
-      .get(url, { responseType: "stream" })
+      .get(url, { responseType: "stream", headers: customHeaders })
       .then((response) => {
         response.data.pipe(res);
       })
@@ -63,16 +74,19 @@ async function handleRequest(req, res) {
   }
 }
 
-async function ssr(url) {
+async function ssr(url, customHeaders) {
   try {
     debug(`Opening ${url} in browser.`);
     const page = await currentBrowser.newPage();
-    await page.goto(url, { waitUntil: "networkidle2" });
+    debug(customHeaders);
+    await page.setExtraHTTPHeaders(customHeaders);
+    await page.goto(url, { waitUntil: "networkidle0" });
     const content = await page.content();
-    page.close();
+    await page.close();
     return content;
   } catch (e) {
     info(`Error while waiting for ${url} to go idle. (${e.message})`);
+    throw new Error(`SSR request failed for ${url}: ${e.message}`);
   }
 }
 

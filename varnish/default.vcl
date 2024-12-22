@@ -1,11 +1,22 @@
 vcl 4.0;
 
 backend default {
-    .host = "ssr-server";
+    .host = "127.0.0.1";
     .port = "3003";
 }
 
+acl purge {
+    "127.0.0.1";
+}
+
 sub vcl_recv {
+    if (req.method == "PURGE") {
+        if (!client.ip ~ purge) {
+            return (synth(403, "Forbidden"));
+        }
+        return (purge);
+    }
+
     if (req.method != "GET" && req.method != "HEAD") {
         return (pass);
     }
