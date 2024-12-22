@@ -1,29 +1,26 @@
-FROM node:lts-alpine3.20
+FROM debian:12-slim
+
+RUN apt-get update && apt-get install -y \
+    nodejs \
+    npm
+
+ENV PUPPETEER_CACHE_DIR=/app/.cache/ \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
 WORKDIR /app
-RUN apk update && apk add bash
-
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont \
-    nodejs
-
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+RUN useradd -m -d /home/chromeuser -s /bin/bash chromeuser \
+    && chown -R chromeuser:chromeuser /app /home/chromeuser \
+    && chmod -R 755 /app
 
 COPY package*.json ./
 RUN npm install
 COPY . .
 
-RUN addgroup -S pptruser && adduser -S -G pptruser pptruser \
-    && mkdir -p /home/pptruser/Downloads /app \
-    && chown -R pptruser:pptruser /home/pptruser \
-    && chown -R pptruser:pptruser /app
+WORKDIR /app/.cache
+RUN npx @puppeteer/browsers install chrome@131.0.6778.204 --install-deps
 
-USER pptruser
+USER chromeuser
 
-COPY . .
+WORKDIR /app
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["sh", "-c", "node ssr-server.js"]

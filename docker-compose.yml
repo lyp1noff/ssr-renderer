@@ -6,6 +6,8 @@ services:
   ssr-server:
     build: .
     container_name: ssr-server
+    cap_add:
+      - SYS_ADMIN
     environment:
       - PSSR_PROXY_URL=https://helen-marlen.com
       - PSSR_PORT_NUMBER=3003

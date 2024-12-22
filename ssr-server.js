@@ -1,6 +1,6 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
-const axios = require('axios');
+const axios = require("axios");
 
 function parseBoolStr(boolStr, defaultValue) {
   return boolStr ? boolStr === "true" : defaultValue;
@@ -21,8 +21,6 @@ const info = LOG_INFO ? console.log : () => null;
 const debug = LOG_DEBUG ? console.log : () => null;
 const warn = LOG_WARNINGS ? console.warn : () => null;
 
-// const BLOCKED_RESOURCE_TYPES = ["image", "media", "stylesheet", "font"];
-
 let currentBrowser;
 
 async function closeBrowser(browser) {
@@ -37,12 +35,10 @@ async function closeBrowser(browser) {
 async function refreshBrowser() {
   debug("Refreshing browser.");
   const oldBrowser = currentBrowser;
-  // currentBrowser = await puppeteer.launch({headless: true, args: ['--no-sandbox']});
   currentBrowser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-gpu", "--disable-setuid-sandbox"],
+    args: ["--disable-gpu"],
   });
-  // currentBrowser = await puppeteer.launch({headless: true});
   if (oldBrowser) {
     await closeBrowser(oldBrowser);
   }
