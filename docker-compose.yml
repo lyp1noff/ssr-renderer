@@ -1,22 +1,31 @@
 services:
-  ssr-server:
-    build: .
-    container_name: ssr-server
-    cap_add:
-      - SYS_ADMIN
-    environment:
-      - PSSR_PROXY_URL=https://helen-marlen.com
-      - PSSR_PORT_NUMBER=3003
-      - PSSR_BLACKLIST_REGEXP=^/(static|fonts|assets)/.*|^/(favicon.ico|logo-GYY.svg|robots.txt)$
-      - PSSR_LOG_DEBUG=false
+  browserless:
+    image: ghcr.io/browserless/chromium:latest
+    container_name: browserless
     restart: always
-    network_mode: "host"
+#    ports:
+#      - "3000:3000"
+
+  ssr-proxy:
+    build: ./ssr-proxy
+    container_name: ssr-proxy
+    restart: always
+    environment:
+      - ORIGIN_BASE_URL=${ORIGIN_BASE_URL}
+      - BROWSERLESS_URL=${BROWSERLESS_URL}
+    depends_on:
+      - browserless
+#    ports:
+#      - "3003:3003"
+
   varnish:
     image: varnish:6.0
-    volumes:
-      - ./varnish/default.vcl:/etc/varnish/default.vcl
-    command: varnishd -F -f /etc/varnish/default.vcl -a :3002
+    container_name: ssr-varnish
     restart: always
+    volumes:
+      - ./varnish/default.vcl:/etc/varnish/default.vcl:ro
+    command: ["varnishd", "-F", "-f", "/etc/varnish/default.vcl", "-a", ":3002"]
     depends_on:
-      - ssr-server
-    network_mode: "host"
+      - ssr-proxy
+    ports:
+      - "3002:3002"
