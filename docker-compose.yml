@@ -3,8 +3,6 @@ services:
     image: ghcr.io/browserless/chromium:latest
     container_name: browserless
     restart: always
-#    ports:
-#      - "3000:3000"
 
   ssr-proxy:
     build: ./ssr-proxy

@@ -21,16 +21,7 @@ sub vcl_recv {
         return (purge);
     }
 
-    # Pass all non-GET/HEAD requests
     if (req.method != "GET" && req.method != "HEAD") {
-        return (pass);
-    }
-
-    # Skip static files and API endpoints
-    if (req.url ~ "\.(js|css|json|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$") {
-        return (pass);
-    }
-    if (req.url ~ "^/(graphql|api|admin|static|fonts|assets|uploads|robots\.txt|sitemap\.xml)") {
         return (pass);
     }
 
@@ -43,7 +34,6 @@ sub vcl_backend_response {
         return (deliver);
     }
 
-    # Respect upstream cache-control
     if (beresp.http.Cache-Control) {
         return (deliver);
     }

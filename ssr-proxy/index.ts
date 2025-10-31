@@ -12,30 +12,30 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  if (/\.(js|css|png|jpg|jpeg|gif|svg|json|ico|woff|woff2|ttf|eot)$/i.test(req.url)) {
-    res.writeHead(403, {"Content-Type": "text/plain"});
-    res.end("Skipped (static asset)");
-    return;
-  }
-
   const targetUrl = new URL(req.url, ORIGIN_BASE_URL).toString();
   console.log(`[SSR] Rendering via WS: ${targetUrl}`);
 
-  try {
-    const browser = await chromium.connectOverCDP(BROWSERLESS_WS);
-    const context = await browser.newContext();
-    const page = await context.newPage();
+  const browser = await chromium.connectOverCDP(BROWSERLESS_WS);
+  const context = await browser.newContext();
+  const page = await context.newPage();
 
-    await page.setExtraHTTPHeaders({
-      "X-Redirect-By": "ssr-server",
-      "User-Agent": "SSR-Renderer",
+  try {
+    await page.route("**/*", route => {
+      const url = route.request().url();
+
+      if (!url.startsWith(ORIGIN_BASE_URL)) {
+        return route.abort();
+      }
+
+      if (url.match(/\.(png|jpg|jpeg|gif|webp|svg|mp4|woff2?|ttf|eot|css)$/i)) {
+        return route.abort();
+      }
+
+      return route.continue();
     });
 
-    await page.goto(targetUrl, {waitUntil: "domcontentloaded", timeout: 5000});
-    await page.waitForFunction('window.prerenderReady === true', {timeout: 10000});
+    await page.goto(targetUrl, {waitUntil: "networkidle", timeout: 10000});
     const html = await page.content();
-    await page.close();
-    await browser.close();
 
     res.writeHead(200, {
       "Content-Type": "text/html; charset=utf-8",
@@ -46,6 +46,9 @@ const server = createServer(async (req, res) => {
   } catch (err) {
     console.error(`[SSR] Failed for ${targetUrl}:`, err);
     res.writeHead(500).end("SSR failed");
+  } finally {
+    await page.close();
+    await browser.close();
   }
 });
 
