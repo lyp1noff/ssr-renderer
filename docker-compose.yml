@@ -3,9 +3,14 @@ services:
     image: ghcr.io/browserless/chromium:latest
     container_name: browserless
     restart: always
+    environment:
+      - DEBUG=-*
+      - CONCURRENT=10
+      - QUEUED=20
+      - TIMEOUT=60000
 
   ssr-proxy:
-    build: ./ssr-proxy
+    image: ghcr.io/lyp1noff/ssr-renderer:latest
     container_name: ssr-proxy
     restart: always
     environment:
