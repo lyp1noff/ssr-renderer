@@ -4,7 +4,7 @@ services:
     container_name: browserless
     restart: always
     environment:
-      - DEBUG=-*
+#      - DEBUG=-*
       - CONCURRENT=10
       - QUEUED=20
       - TIMEOUT=60000

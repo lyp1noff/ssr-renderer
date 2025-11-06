@@ -8,21 +8,26 @@ const SSR_CACHE_TTL = parseInt(process.env.SSR_CACHE_TTL || "1800", 10);
 
 const server = createServer(async (req, res) => {
     if (!req.url) return;
-    if (req.url === "/health") {
-        res.writeHead(200).end("ok");
-        return;
-    }
+    if (req.url === "/health") return res.writeHead(200).end("ok");
 
     const targetUrl = new URL(req.url, ORIGIN_BASE_URL).toString();
     console.log(`[SSR] Rendering via WS: ${targetUrl}`);
 
-    const browser = await chromium.connectOverCDP(BROWSERLESS_WS);
-    const context = await browser.newContext({
-        userAgent: "ssr-renderer",
-    });
-    const page = await context.newPage();
+    let browser;
+    let context;
+    let page;
 
     try {
+        try {
+            browser = await chromium.connectOverCDP(BROWSERLESS_WS);
+        } catch (e) {
+            console.error("[SSR] Browserless unavailable:", e);
+            return res.writeHead(503).end("SSR unavailable");
+        }
+
+        context = await browser.newContext({userAgent: "ssr-renderer"});
+        page = await context.newPage();
+
         await page.route("**/*", route => {
             const url = route.request().url();
 
@@ -50,10 +55,15 @@ const server = createServer(async (req, res) => {
         console.error(`[SSR] Failed for ${targetUrl}:`, err);
         res.writeHead(500).end("SSR failed");
     } finally {
-        await page.close();
-        await browser.close();
+        if (page) await page.close().catch(() => {
+        });
+        if (context) await context.close().catch(() => {
+        });
+        if (browser) await browser.close().catch(() => {
+        });
     }
 });
+
 
 server.listen(PORT, () =>
     console.log(`[SSR] Proxy running on port ${PORT} → ${BROWSERLESS_WS}`)
