@@ -3,6 +3,9 @@ services:
     image: ghcr.io/browserless/chromium:latest
     container_name: browserless
     restart: always
+    shm_size: "2g"
+    tmpfs:
+      - /tmp:size=2g,mode=1777
     environment:
       - DEBUG=-*
       - CONCURRENT=10
