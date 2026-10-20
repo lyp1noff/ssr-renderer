@@ -1,53 +1,36 @@
 vcl 4.0;
 
 backend default {
-    .host = "ssr-proxy";
+    .host = "renderer";
     .port = "3003";
-    .first_byte_timeout = 30s;
+    .connect_timeout = 3s;
+    .first_byte_timeout = 40s;
     .between_bytes_timeout = 15s;
-    .connect_timeout = 10s;
-}
-
-acl purge {
-    "127.0.0.1";
-    "localhost";
 }
 
 sub vcl_recv {
-    if (req.method == "PURGE") {
-        if (!client.ip ~ purge) {
-            return (synth(403, "Forbidden"));
-        }
-        return (purge);
-    }
-
-    if (req.method != "GET" && req.method != "HEAD") {
-        return (pass);
-    }
-
+    if (req.method != "GET" && req.method != "HEAD") { return (synth(405)); }
+    if (req.url ~ "^/(health|ready|metrics)([?]|$)") { return (pass); }
+    if (req.http.Authorization || req.http.Cookie) { return (pass); }
     return (hash);
 }
 
 sub vcl_backend_response {
-    if (beresp.status >= 400) {
+    if (bereq.is_bgfetch && beresp.status >= 500) { return (abandon); }
+    if (beresp.status != 200 || beresp.http.X-SSR-Served != "true" ||
+        beresp.http.Content-Type !~ "^text/html") {
         set beresp.uncacheable = true;
+        set beresp.ttl = 0s;
+        set beresp.grace = 0s;
         return (deliver);
     }
-
-    if (beresp.http.Cache-Control) {
-        return (deliver);
-    }
-
-    # Default TTL
-    set beresp.ttl = 1d;
-    unset beresp.http.Set-Cookie;
+    set beresp.grace = 1m;
+    set beresp.keep = 1m;
     return (deliver);
 }
 
 sub vcl_deliver {
-    if (obj.hits > 0) {
-        set resp.http.X-Cache = "HIT";
-    } else {
-        set resp.http.X-Cache = "MISS";
-    }
+    if (obj.hits > 0) { set resp.http.X-Cache = "HIT"; }
+    else { set resp.http.X-Cache = "MISS"; }
+    if (obj.hits > 0 && obj.ttl < 0s) { set resp.http.X-SSR-Stale = "true"; }
 }

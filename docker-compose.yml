@@ -1,37 +1,41 @@
 services:
-  browserless:
-    image: ghcr.io/browserless/chromium:latest
-    container_name: browserless
-    restart: always
-    shm_size: "2g"
+  renderer:
+    image: ${RENDERER_IMAGE:?Set RENDERER_IMAGE}
+    build: ./renderer
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 35s
+    shm_size: 2g
+    mem_limit: 8g
+    pids_limit: 512
     tmpfs:
-      - /tmp:size=2g,mode=1777
+      - /tmp:size=1g,nr_inodes=262144,mode=1777
     environment:
-      - DEBUG=-*
-      - CONCURRENT=10
-      - QUEUED=20
-      - TIMEOUT=60000
-
-  ssr-proxy:
-    image: ghcr.io/lyp1noff/ssr-renderer:latest
-    container_name: ssr-proxy
-    restart: always
-    environment:
-      - ORIGIN_BASE_URL=${ORIGIN_BASE_URL}
-      - BROWSERLESS_URL=${BROWSERLESS_URL}
-    depends_on:
-      - browserless
-#    ports:
-#      - "3003:3003"
+      ORIGIN_BASE_URL: ${ORIGIN_BASE_URL:?Set ORIGIN_BASE_URL}
+      RENDER_CHECK_PATH: ${RENDER_CHECK_PATH:-/}
+      RESOURCE_ORIGINS: ${RESOURCE_ORIGINS:-}
+      BROWSER_COUNT: ${BROWSER_COUNT:-2}
+      PAGES_PER_BROWSER: ${PAGES_PER_BROWSER:-4}
+      QUEUE_LIMIT: ${QUEUE_LIMIT:-64}
+      QUEUE_TIMEOUT_MS: ${QUEUE_TIMEOUT_MS:-5000}
+      RENDER_TIMEOUT_MS: ${RENDER_TIMEOUT_MS:-20000}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-1800}
+      BROWSER_MAX_RENDERS: ${BROWSER_MAX_RENDERS:-1000}
+      BROWSER_MAX_AGE_MS: ${BROWSER_MAX_AGE_MS:-1800000}
+    logging:
+      driver: local
+      options: {max-size: "50m", max-file: "3"}
 
   varnish:
-    image: varnish:6.0
-    container_name: ssr-varnish
-    restart: always
+    image: varnish:7.6@sha256:85580f7b7a622bdb652357242337cd5268be7779356dc04658179d60649b5ebf
+    restart: unless-stopped
+    command: ["varnishd", "-F", "-f", "/etc/varnish/default.vcl", "-a", ":3002", "-s", "malloc,${CACHE_SIZE:-2g}"]
     volumes:
       - ./varnish/default.vcl:/etc/varnish/default.vcl:ro
-    command: ["varnishd", "-F", "-f", "/etc/varnish/default.vcl", "-a", ":3002"]
     depends_on:
-      - ssr-proxy
+      renderer: {condition: service_healthy}
     ports:
-      - "3002:3002"
+      - "127.0.0.1:3002:3002"
+    logging:
+      driver: local
+      options: {max-size: "50m", max-file: "3"}
